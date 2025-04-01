@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import tarfile
 import time
 from itertools import chain, cycle
 from pathlib import Path
@@ -224,19 +225,29 @@ def cache_model_from_s3(s3_uri: str, force=False):
     if re.match("^s3://([^/]+)/(.*?([^/]+)/?)$", s3_uri) is None:
         raise ValueError(f"Not a valid S3 URI: {s3_uri}")
 
-    # we expect the prefix to point to a "directory" on S3
-    if not s3_uri.endswith("/"):
-        s3_uri += "/"
-
     cache_home = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
     bucket, prefix = s3_uri.replace("s3://", "").split("/", 1)
     bucket_cache_path = cache_home / "autogluon" / "timeseries" / bucket
 
-    for obj_path in list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix):
-        destination_path = bucket_cache_path / obj_path
-        if not force and destination_path.exists():
-            continue
-        download(bucket, obj_path, local_path=str(destination_path))
+    # we expect the prefix to point to either a tarball file or "directory" on S3
+    if prefix.endswith(".tar.gz"):
+        destination_path = bucket_cache_path / prefix
+        if force or not destination_path.exists():
+            download(bucket, prefix, local_path=str(destination_path))
+
+        # unpack tarball to the same directory
+        with tarfile.open(destination_path, "r:gz") as tar:
+            tar.extractall(path=destination_path.parent)
+
+        return str(destination_path.parent / "run-0" / "checkpoint-final")
+    else:
+        if not prefix.endswith("/"):
+            prefix += "/"
+        for obj_path in list_bucket_prefix_suffix_contains_s3(bucket=bucket, prefix=prefix):
+            destination_path = bucket_cache_path / obj_path
+            if not force and destination_path.exists():
+                continue
+            download(bucket, obj_path, local_path=str(destination_path))
 
     return str(bucket_cache_path / prefix)
 

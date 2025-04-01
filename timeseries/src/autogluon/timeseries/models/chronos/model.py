@@ -298,7 +298,7 @@ class ChronosModel(AbstractTimeSeriesModel):
             self.model_path,
             device_map=device,
             # optimization cannot be used during fine-tuning
-            optimization_strategy=None if is_training else self.optimization_strategy,
+            # optimization_strategy=None if is_training else self.optimization_strategy,
             torch_dtype=self.torch_dtype,
         )
 
@@ -629,7 +629,7 @@ class ChronosModel(AbstractTimeSeriesModel):
                         batch,
                         prediction_length=self.prediction_length,
                         quantile_levels=self.quantile_levels,
-                        num_samples=self.num_samples,
+                        # num_samples=self.num_samples,
                     )
                     batch_quantiles.append(qs.numpy())
                     batch_means.append(mn.numpy())
